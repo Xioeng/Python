@@ -9,11 +9,13 @@ def finiteDiffDerivative(u, dx, dy):
     return u_x, u_y
 
 def laplacian(u, dx, dy):
-    u_xx, u_yy = u.copy(), u.copy()
+    u_xx, u_yy = np.zeros(u.shape),np.zeros(u.shape)# u.copy(), u.copy()
+    #Inside of the domain
     u_yy[1:-1, :] = (u[2:, :] - 2*u[1:-1, :] + u[:-2, :])
     u_xx[:, 1:-1] = (u[:, 2:] - 2*u[:, 1:-1] + u[:, :-2])
-    # u_yy[0,:] = 0.0; u_yy[-1,:] = 0.0
-    # u_xx[:,0] = 0.0; u_xx[:,-1] = 0.0
+    #On the boundary
+    u_yy[0,:] = 2*(u_yy[1,:]-u_yy[0,:]); u_yy[-1,:] = 2*(u_yy[-2,:]-u_yy[-1,:])
+    u_xx[:,0] = 2*(u_xx[:,1]-u_xx[:,0]); u_xx[:,-1] = 2*(u_xx[:,-2]-u_xx[:,-1])
     return u_xx/(dx**2) + u_yy/(dy**2)
 
 
@@ -53,7 +55,7 @@ class AdvectionDiffusion:
             V_x, V_y = self.v(X, Y, times[n])
             f_n = self.f(X, Y, times[n])
             u_n_plus = u_n + dt*( self.d*laplacians[n] - V_x*u_x - V_y*u_y + f_n )
-            u_n_plus[0,:] = u_n_plus[1,:]; u_n_plus[-1,:] = u_n_plus[-2,:]
+            u_n_plus[0,:] = u_n_plus[1,:]; u_n_plus[-1,:] = u_n_plus[-2,:] 
             u_n_plus[:,0] = u_n_plus[:,1]; u_n_plus[:,-1] = u_n_plus[:,-2]
             u_solutions[n+1] = u_n_plus
 
@@ -61,27 +63,32 @@ class AdvectionDiffusion:
 
 
 if __name__ == '__main__':
+
     # Initial condition (Gaussian pulse)
     def pulse(x,y, center = [.2, .2]):
         return np.exp(-((x - center[0]) ** 2 + (y - center[1]) ** 2) / 0.01)
-    def initial_condition(x,y, center = [.2, .2]):
+    def initial_condition(x,y, center = [.2, .2]):#Output is a matrix, same shape as the meshgrid defined at line 46
         return 0.0*pulse(x,y, center)
     
     # Forcing term
-    def forcing_term(x,y,t):
+    def forcing_term(x,y,t):#Output is a matrix, same shape as the meshgrid defined at line 46
         val = 100*pulse(x,y, [0.8,0.8])
         return val
 
-    # Velocity field
-    def velocity_field(X, Y, t):
+    # Velocity field, Vx and Vy components
+    def velocity_field(X, Y, t): #Output are 2 matrices, both same shape as the meshgrid defined at line 46
+        frequency = 3.0
+        angle = 225 + 35 * np.cos(2 * np.pi * frequency * t)
+        angle_rad = np.radians(angle)
         C = np.ones(X.shape)
-        return -1.0*C, -0.4*C
+        return np.sin(angle_rad)*C, np.cos(angle_rad)*C
+    
     diffusivity_constant = 0.01
 
     # Grid points 
-    grid_points = (0., 1., 0., 1.)
+    grid_points = (0., 1., 0., 1.)#corners of the square
     T = 1.0
-    deltas = (0.02, 0.02, 0.01)
+    deltas = (0.02, 0.02, 0.01) #dx, dy, dt
     pde_eq = AdvectionDiffusion(initial_condition, forcing_term, velocity_field, diffusivity_constant)
 
     solutions, laplacians = pde_eq.solve(grid_points,
